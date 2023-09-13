@@ -1,0 +1,406 @@
+<?php
+require_once '../database.php';
+
+$db = new Database();
+
+if(isset($_GET['generate']) AND $_GET['generate'] != "")
+{
+	// Fetch courses for a particular semester
+	$semester_id = $_GET['generate']; // Replace with the appropriate semester ID
+
+	// Database connection code here
+
+	// Fetch courses from the database
+	$sampleCourses = array();
+	
+	$joins = [
+    ['type' => 'INNER', 'table' => 'Departments', 'on' => 'Departments.department_id = Courses.department_id'],
+    ['type' => 'INNER', 'table' => 'Levels', 'on' => 'Levels.level_id = Courses.level_id'],
+    ['type' => 'INNER', 'table' => 'Lecturers', 'on' => 'Lecturers.lecturer_id = Courses.lecturer_id']
+	];
+	$whereClauses = [
+	    ['field' => 'Courses.semester_id', 'operator' => '=', 'value' => $semester_id]
+	];	
+	$getCourse = $db->selectWhereJoin("Courses", ["course_name", "department_name", "level_name", "lecturer_name"], $joins, $whereClauses);
+	foreach ($getCourse as $key)
+	{
+		$arr = [
+			"course_name" => $key['course_name'],
+			"department_name" => $key['department_name'],
+			"level_name" => $key['level_name'],
+			"lecturer_name" => $key['lecturer_name']
+		];
+		array_push($sampleCourses, $arr);
+	}
+
+	// print_r($sampleCourses);
+	// exit;
+
+	// Fetch classrooms from the database
+	$classrooms = array();
+	$getClass = $db->fetch("Classrooms");
+	foreach ($getClass as $key) {
+		array_push($classrooms, $key['classroom_name']);
+	}
+
+
+	// Define the days of the week and time slots
+	$daysOfWeek = array("Monday", "Tuesday", "Wednesday", "Thursday", "Friday");
+
+	$timeSlots = array(
+	    "8:00 AM - 10:00 AM",
+	    "10:00 AM - 12:00 PM",
+	    "12:00 PM - 2:00 PM",
+	    "2:00 PM - 4:00 PM",
+	    "4:00 PM - 6:00 PM"
+	);
+
+	// Create an empty timetable structure
+	$timetable = array();
+
+	// Initialize the timetable with empty slots
+	foreach ($daysOfWeek as $day)
+	{
+	    foreach ($timeSlots as $timeSlot) {
+	        foreach ($classrooms as $classroom) {
+	            $timetable[$day][$timeSlot][$classroom] = "";
+	        }
+	    }
+	}
+
+	
+
+	// Initialize variables for tracking the current slot/classroom
+	$currentDay = $daysOfWeek[0];
+	$currentTimeSlot = $timeSlots[0];
+	$currentClassroom = $classrooms[0];
+
+	// Assign courses to the timetable in a round-robin fashion while checking for overlaps
+	foreach ($sampleCourses as $course) {
+	    while (true) {
+	        $day = $currentDay;
+	        $timeSlot = $currentTimeSlot;
+	        $classroom = $currentClassroom;
+
+	        if (!isOverlap($timetable, $day, $timeSlot, $classroom)) {
+	            $timetable[$day][$timeSlot][$classroom] = $course;
+	            break;
+	        }
+
+	        getNextSlotClassroom($daysOfWeek, $timeSlots, $classrooms, $currentDay, $currentTimeSlot, $currentClassroom);
+	    }
+
+	    getNextSlotClassroom($daysOfWeek, $timeSlots, $classrooms, $currentDay, $currentTimeSlot, $currentClassroom);
+	}
+
+
+
+
+	// Validate the timetable
+	validateTimetable($timetable);
+
+
+	echo json_encode(["status" => 200, "data" => $timetable]);
+
+}
+
+// Function to check for course overlap
+function isOverlap($timetable, $day, $timeSlot, $classroom)
+{
+    return !empty($timetable[$day][$timeSlot][$classroom]);
+}
+
+// Function to calculate the number of conflicts in the timetable
+function calculateConflicts($timetable)
+{
+    $conflicts = 0;
+
+    foreach ($timetable as $day => $slots) {
+        foreach ($slots as $timeSlot => $classrooms) {
+            foreach ($classrooms as $classroom => $courseName) {
+                if (isOverlap($timetable, $day, $timeSlot, $classroom)) {
+                    $conflicts++;
+                }
+            }
+        }
+    }
+
+    return $conflicts;
+}
+
+// Function to get the next available time slot and classroom in a round-robin fashion
+function getNextSlotClassroom($daysOfWeek, $timeSlots, $classrooms, &$currentDay, &$currentTimeSlot, &$currentClassroom)
+{
+    $currentDayIndex = array_search($currentDay, $daysOfWeek);
+    $currentTimeSlotIndex = array_search($currentTimeSlot, $timeSlots);
+    $currentClassroomIndex = array_search($currentClassroom, $classrooms);
+
+    $currentClassroomIndex++;
+    if ($currentClassroomIndex >= count($classrooms)) {
+        $currentClassroomIndex = 0;
+        $currentTimeSlotIndex++;
+        if ($currentTimeSlotIndex >= count($timeSlots)) {
+            $currentTimeSlotIndex = 0;
+            $currentDayIndex++;
+            if ($currentDayIndex >= count($daysOfWeek)) {
+                $currentDayIndex = 0;
+            }
+        }
+    }
+
+    $currentDay = $daysOfWeek[$currentDayIndex];
+    $currentTimeSlot = $timeSlots[$currentTimeSlotIndex];
+    $currentClassroom = $classrooms[$currentClassroomIndex];
+}
+
+// Function to validate the timetable
+function validateTimetable(&$timetable)
+{
+    global $daysOfWeek;
+    global $timeSlots;
+    global $classrooms;
+    $initialConflicts = calculateConflicts($timetable);
+    $maxAttempts = 100;
+    $attempts = 0;
+
+
+    while ($attempts < $maxAttempts) {
+        $randomDay = $daysOfWeek[array_rand($daysOfWeek)];
+        $randomTimeSlot = $timeSlots[array_rand($timeSlots)];
+        $randomClassroom = $classrooms[array_rand($classrooms)];
+
+        $courseToSwap = $timetable[$randomDay][$randomTimeSlot][$randomClassroom];
+
+        $destinationDay = $daysOfWeek[array_rand($daysOfWeek)];
+        $destinationTimeSlot = $timeSlots[array_rand($timeSlots)];
+        $destinationClassroom = $classrooms[array_rand($classrooms)];
+
+        if (!isOverlap($timetable, $destinationDay, $destinationTimeSlot, $destinationClassroom)) {
+            $timetable[$randomDay][$randomTimeSlot][$randomClassroom] = "";
+            $timetable[$destinationDay][$destinationTimeSlot][$destinationClassroom] = $courseToSwap;
+
+            $newConflicts = calculateConflicts($timetable);
+
+            if ($newConflicts <= $initialConflicts) {
+                $initialConflicts = $newConflicts;
+            } else {
+                $timetable[$randomDay][$randomTimeSlot][$randomClassroom] = $courseToSwap;
+                $timetable[$destinationDay][$destinationTimeSlot][$destinationClassroom] = "";
+            }
+        }
+
+        $attempts++;
+
+        if ($initialConflicts == 0) {
+            break;
+        }
+    }
+}
+
+
+
+
+
+//     global $days, $timeslots;
+
+	//     // Shuffle the order of courses, classrooms, lecturers, days, and timeslots to distribute evenly
+	//     shuffle($courses);
+	//     shuffle($classrooms);
+	//     shuffle($lecturers);
+	//     shuffle($days);
+	//     shuffle($timeslots);
+
+	//     foreach ($courses as $course) {
+	//         foreach ($classrooms as $classroom) {
+	//             foreach ($lecturers as $lecturer) {
+	//                 foreach ($days as $day) {
+	//                     foreach ($timeslots as $timeslot) {
+	//                         $timeslot_end = date('H:i:s', strtotime($timeslot) + 7200); // Add 2 hours
+
+	//                         // Check if this combination is already in use
+	//                         $conflictCheck = $db->selectWhere(
+	//                             'Timetable',
+	//                             ['COUNT(*) as count'],
+	//                             [
+	//                                 ['field' => 'classroom_id', 'operator' => '=', 'value' => $classroom['classroom_id']],
+	//                                 ['field' => 'day_of_week', 'operator' => '=', 'value' => $day],
+	//                                 ['field' => 'timeslot_start', 'operator' => '=', 'value' => $timeslot],
+	//                                 ['field' => 'timeslot_end', 'operator' => '=', 'value' => $timeslot_end]
+	//                             ]
+	//                         );
+
+	//                         if ($conflictCheck[0]['count'] == 0) {
+	//                             // No conflict, insert the lecture into the timetable
+	//                             $insertData = [
+	//                                 'course_id' => $course['course_id'],
+	//                                 'classroom_id' => $classroom['classroom_id'],
+	//                                 'day_of_week' => $day,
+	//                                 'timeslot_start' => $timeslot,
+	//                                 'timeslot_end' => $timeslot_end,
+	//                                 'lecturer_id' => $lecturer['lecturer_id']
+	//                             ];
+	//                             $db->insert('Timetable', $insertData);
+	//                         }
+	//                     }
+	//                 }
+	//             }
+	//         }
+	//     }
+
+	// $courses = [];
+	// $lecturers = [];
+	// // Example usage
+	// $get = $db->fetchWhere('Courses', 'semester_id', $semester_id, "*");
+	// foreach ($get as $key)
+	// {
+
+	// }
+	// $classrooms = $db->fetch('Classrooms');
+	// $lecturers = $db->fetch('Lecturers');
+
+	// generateTimetable($db, $courses, $classrooms, $lecturers);
+
+
+
+
+
+
+
+
+
+	<?php
+require '../database.php'; // Include the Database class
+
+// Initialize the database connection
+$db = new Database();
+
+if (isset($_GET['generate']) && $_GET['generate'] !== "")
+{
+    // Fetch courses for a particular semester
+    $semester_id = $_GET['generate']; // Replace with the appropriate semester ID
+
+    // Fetch courses and classrooms from the database in a single query
+    $courses = $db->selectWhereJoin(
+        "Courses",
+        ["course_name", "department_name", "level_name", "lecturer_name"],
+        [
+            ['type' => 'INNER', 'table' => 'Departments', 'on' => 'Departments.department_id = Courses.department_id'],
+            ['type' => 'INNER', 'table' => 'Levels', 'on' => 'Levels.level_id = Courses.level_id'],
+            ['type' => 'INNER', 'table' => 'Lecturers', 'on' => 'Lecturers.lecturer_id = Courses.lecturer_id'],
+        ],
+        [['field' => 'Courses.semester_id', 'operator' => '=', 'value' => $semester_id]]
+    );
+
+    $classrooms = [];
+
+    $get_classrooms = $db->fetch("Classrooms");
+    foreach ($get_classrooms as $key)
+    {
+    	array_push($classrooms, $key);	
+    }
+
+    // print_r($classrooms);
+    // exit;
+
+    // Define the days of the week and time slots
+	$days = array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday');
+	$timeslots = array('8AM-10AM', '10AM-12PM', '12PM-2PM', '2PM-4PM', '4PM-6PM');
+
+	   // Create an empty timetable structure
+	$timetable = array(
+	    'Monday' => array(),
+	    'Tuesday' => array(),
+	    'Wednesday' => array(),
+	    'Thursday' => array(),
+	    'Friday' => array()
+	);
+
+	foreach ($days as $day)
+	{
+	    foreach ($timeslots as $timeslot)
+	    {
+	        foreach ($classrooms as $classroom)
+	        {
+	        	$classroomName = $classroom['classroom_name'];
+	            $timetable[$day][$timeslot][$classroomName] = null;
+	        }
+	    }
+	}
+
+	// Helper function to check if a lecture slot is available
+	function isSlotAvailable($timetable, $day, $timeslot, $classroom)
+	{
+	    return $timetable[$day][$timeslot][$classroom] === null;
+	}
+
+	// Helper function to check if a lecture slot is unique
+	function isSlotUnique($timetable, $day, $timeslot, $classroom)
+	{
+	    $count = 0;
+	    foreach ($timetable[$day][$timeslot] as $c => $value) {
+	        if ($c !== $classroom && $value !== null) {
+	            $count++;
+	        }
+	    }
+	    return $count === 0;
+	}
+
+	// Helper function to assign a course to a lecture slot
+	function assignSlot($timetable, $day, $timeslot, $classroom, $course)
+	{
+	    $timetable[$day][$timeslot][$classroom] = $course;
+	}
+
+	// Helper function to remove a course from a lecture slot
+	function removeSlot($timetable, $day, $timeslot, $classroom)
+	{
+	    $timetable[$day][$timeslot][$classroom] = null;
+	}
+
+	// Recursive backtracking function to generate the timetable
+	function generateTimetable($timetable, $courses, $index)
+	{
+	    // Base case: All courses have been assigned
+	    if ($index >= count($courses))
+	    {
+	        return true;
+	    }
+
+	    $course = $courses[$index];
+
+
+		foreach ($timetable as $day => $slots)
+		{
+		    foreach ($slots as $timeslot => $classrooms)
+		    {
+		        foreach ($classrooms as $classroom => $value)
+		        {
+	    	print_r($classroom);
+		            // Check if the current slot is available and unique
+		            if (isSlotAvailable($timetable, $day, $timeslot, $classroom) &&
+		                isSlotUnique($timetable, $day, $timeslot, $classroom))
+		            {
+		                // Assign the course to the slot
+		                assignSlot($timetable, $day, $timeslot, $classroom, $course);
+
+		                // Recursively generate the timetable for the next course
+		                if (generateTimetable($timetable, $courses, $index + 1))
+		                {
+		                    return true;
+		                }
+
+		                // Remove the course from the slot (backtracking)
+		                removeSlot($timetable, $day, $timeslot, $classroom);
+		            }
+		        }
+		    }
+		}
+
+		// No valid assignment found for the current course
+		return false;
+	}	
+	// Call the backtracking function to generate the timetable
+	generateTimetable($timetable, $courses, 0);
+	echo json_encode($timetable);
+	    // echo "Timetable generated successfully!";
+}

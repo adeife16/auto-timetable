@@ -1,6 +1,6 @@
 <?php
 
-require_once 'database.php';
+require_once '../database.php';
 
 
 $email = $_POST['email'];
@@ -12,10 +12,9 @@ $db = new Database();
 $selectFields = array('*');
 $whereClauses = array(
     array('field' => 'email', 'operator' => '=', 'value' => $email),
-    array('field' => 'status', 'operator' => '=', 'value' => 'Active')
 );
 
-$check = $db->selectWhere('five_users', $selectFields, $whereClauses);
+$check = $db->selectWhere('admin', $selectFields, $whereClauses);
 
 
 
@@ -24,9 +23,9 @@ if(count($check) == 1)
 	foreach($check as $data)
 	{
 		$user_id = $data['user_id'];
-		$fname = $data['first_name'];
+		$name = $data['name'];
 		$password = $data['password'];
-		$role = $data['role'];
+		// $role = $data['role'];
 	}
 
 	if(password_verify($pass, $password))
@@ -35,8 +34,8 @@ if(count($check) == 1)
 		session_start();
 
 		$_SESSION['user_id'] = $user_id;
-		$_SESSION['name'] = $fname;
-		$_SESSION['role'] = $role;
+		$_SESSION['name'] = $name;
+		// $_SESSION['role'] = $role;
 
 
 		$json = array("status" => 200);
