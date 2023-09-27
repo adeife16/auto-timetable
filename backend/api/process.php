@@ -73,26 +73,37 @@ if(isset($_GET['generate']) AND $_GET['generate'] != "")
 	    }
 	}
 	$i = 0;
-	$limit = count($sampleCourses);
+	shuffle($combinedArray);
+	// print_r($combinedArray[23]);
+	// print_r($sampleCourses);
+
+	$index = [];
+	for($j = 0; $j < count($combinedArray); $j++)
+	{
+		array_push($index, $j);
+	}
+
+	shuffle($index);
 
 
 	foreach ($sampleCourses as $key)
 	{
-		$combinedArray[$i]['course'] = $key["course_name"];
-		$combinedArray[$i]['department'] = $key["department_name"];
-		$combinedArray[$i]['level'] = $key["level_name"];
-		$combinedArray[$i]['lecturer'] = $key["lecturer_name"];
+		$combinedArray[$index[$i]]['course'] = $key["course_name"];
+		$combinedArray[$index[$i]]['department'] = $key["department_name"];
+		$combinedArray[$index[$i]]['level'] = $key["level_name"];
+		$combinedArray[$index[$i]]['lecturer'] = $key["lecturer_name"];
 		
-		array_push($timetable, $combinedArray[$i]);
+		array_push($timetable, $combinedArray[$index[$i]]);
+
 
 		$data = [
-			"day" => $combinedArray[$i]['day'],
-			"time" => $combinedArray[$i]['time'],
-			"class" => $combinedArray[$i]['class'],
-			"course" => $combinedArray[$i]['course'],
-			"department" => $combinedArray[$i]['department'],
-			"level" => $combinedArray[$i]['level'],
-			"lecturer" => $combinedArray[$i]['lecturer'],
+			"day" => $combinedArray[$index[$i]]['day'],
+			"time" => $combinedArray[$index[$i]]['time'],
+			"class" => $combinedArray[$index[$i]]['class'],
+			"course" => $combinedArray[$index[$i]]['course'],
+			"department" => $combinedArray[$index[$i]]['department'],
+			"level" => $combinedArray[$index[$i]]['level'],
+			"lecturer" => $combinedArray[$index[$i]]['lecturer'],
 			"semester" => $semester_id
 		];
 
@@ -103,6 +114,7 @@ if(isset($_GET['generate']) AND $_GET['generate'] != "")
 	shuffle($timetable);
 	echo json_encode(["status" => 200, "data" => $timetable]);
 }
+
 
 if(isset($_POST['download']) AND $_POST['download'] !="")
 {
@@ -121,6 +133,11 @@ if(isset($_POST['download']) AND $_POST['download'] !="")
 
 	if(!empty($select))
 	{
+		// print_r($select);
+		// exit;
+		// foreach ($select as $key) {
+			
+		// }
 		echo json_encode(["status" => 200, "data" => $select]);
 	}
 }
