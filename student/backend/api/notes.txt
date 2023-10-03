@@ -1,0 +1,18 @@
+#00933d
+
+linear-gradient(-45deg,#00933d,#be9e61)
+
+
+linear-gradient(-45deg,#be9e61,#d5c4a0)
+#038238
+
+
+add 404 page
+restrict instructors account
+add progress functions
+add all enrolled courses to side menu
+link all topics using next and previous buttons
+add cbt functionality
+add index to topic content
+add title to content
+add grade visuallization functionality

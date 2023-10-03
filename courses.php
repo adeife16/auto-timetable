@@ -6,7 +6,7 @@
         <h1 class="h3 mb-0 text-gray-800">Add Courses</h1>
       </div>
       <div class="row justify-content-center m-3">
-      	<div class="col-md-8">
+      	<div class="col-md-8 col-sm-12">
       		<div class="card shadow py-2 h-100">
       			<div class="card-body">
       				<div class="prog-form ">
@@ -61,7 +61,7 @@
       	</div>
       </div>
       <div class="row justify-content-center m-3">
-      	<div class="col-md-12">
+      	<div class="col-md-12 col-sm-12">
           <div class="card shadow h-100 py-2">
             <div class="card-body">
             	<div class="table-responsive">
